@@ -1,0 +1,35 @@
+//@version=6
+indicator(title = 'Custom Stochastic', shorttitle = 'SW TSL Stoch', overlay = false)
+
+StochLength = input.int(12, title = 'StochLength')
+smoothingLength = input.int(3, title = 'smoothingLength')
+overBought = 80
+overSold = 20
+
+lowestLow = ta.lowest(low, StochLength)
+highestHigh = ta.highest(high, StochLength)
+
+lowDiff = highestHigh - lowestLow
+K = lowDiff != 0 ? 100 * (close - lowestLow) / lowDiff : 0
+
+D = ta.sma(K, smoothingLength)
+D_lowest = ta.lowest(D, StochLength)
+DoubleSlowKDen = ta.highest(D, StochLength) - D_lowest
+DoubleSlowK = DoubleSlowKDen != 0 ? 100 * (D - D_lowest) / DoubleSlowKDen : na
+
+fastK = highestHigh != lowestLow ? (close - lowestLow) / (highestHigh - lowestLow) * 100 : 0
+slowK_plot = plot(ta.sma(fastK, smoothingLength), color = color.white, linewidth = 2)
+
+plot(DoubleSlowK, color = color.rgb(251, 255, 0, 30), linewidth = 1)
+hline_overBought = hline(overBought, 'Overbought Line', color = color.new(color.rgb(255, 0, 0), 100), linewidth = 1)
+hline_overSold = hline(overSold, 'Oversold Line', color = color.new(color.rgb(0, 255, 0), 100), linewidth = 1)
+hline_top = hline(100, 'Top Line', color = color.new(color.gray, 100), linewidth = 1)
+hline_bottom = hline(0, 'Bottom Line', color = color.new(color.gray, 100), linewidth = 1)
+
+fill(hline_overBought, hline_top, color = color.rgb(255, 0, 0, 22))
+fill(hline_bottom, hline_overSold, color = color.rgb(0, 255, 0, 22))
+
+lineStyle = input.string(title = 'Line Style', defval = 'Solid', options = ['Solid', 'Dashed', 'Dotted'])
+plotStyle = lineStyle == 'Dashed' ? plot.style_linebr : lineStyle == 'Dotted' ? plot.style_circles : plot.style_line
+
+plot(50, 'Middle Band', color = color.rgb(88, 88, 88), linewidth = 3, style = plotStyle)

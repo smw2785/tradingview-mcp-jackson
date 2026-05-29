@@ -1,65 +1,111 @@
 {
-  "watchlist": ["BTCUSDT"],
-  "default_timeframe": "1",
-
+  "watchlist": [
+    "NASDAQ:QQQ",
+    "AMEX:SPY",
+    "AMEX:IWM",
+    "NASDAQ:AAPL",
+    "NASDAQ:TSLA",
+    "NASDAQ:NVDA",
+    "NASDAQ:AMZN",
+    "NASDAQ:META"
+  ],
+  "default_timeframe": "5",
+  "timeframes": {
+    "primary": "5m",
+    "secondary": "2m",
+    "tertiary": "1m",
+    "note": "All three timeframes must be checked simultaneously before entering any trade"
+  },
   "strategy": {
-    "name": "10-Second Momentum Scalper",
-    "sources": [
-      "Price momentum — buy if last close > previous close (green candle)",
-      "RSI filter — only trade when RSI is not at an extreme (30–70 range)"
-    ],
-    "primary_timeframes": [
-      "1-minute (signal source)",
-      "10-second execution loop"
-    ]
+    "name": "Triple Sync Logic (TSL)",
+    "source": "user-described",
+    "pine_script_path": "pine/custom-stochastic.pine",
+    "instrument_type": "options",
+    "long_execution": "Buy Calls",
+    "short_execution": "Buy Puts"
   },
-
   "indicators": {
-    "rsi_14": "Momentum filter. Only trade when RSI is between 30–70 (avoid extremes).",
-    "price_momentum": "Compare last close vs previous close. Up = long signal. Down = short signal."
+    "TSL_1": {
+      "name": "Custom Stochastic - Slow K (White Line)",
+      "script": "pine/custom-stochastic.pine",
+      "params": { "StochLength": 12, "smoothingLength": 3 },
+      "support_zone": "below 20 (green area)",
+      "resistance_zone": "above 80 (red area)",
+      "midline": 50
+    },
+    "TSL_2": {
+      "name": "Custom Stochastic - Double Slow K (Yellow/Gold Dotted Line)",
+      "script": "pine/custom-stochastic.pine",
+      "params": { "StochLength": 12, "smoothingLength": 3 },
+      "support_zone": "below 20 (green area)",
+      "resistance_zone": "above 80 (red area)"
+    },
+    "MA_21": {
+      "type": "SMA",
+      "period": 21,
+      "color": "White",
+      "role": "Fast moving average — primary bounce and 21-50 qualification line"
+    },
+    "MA_50": {
+      "type": "SMA",
+      "period": 50,
+      "color": "Green",
+      "role": "Medium moving average — bounce target and 21-50 qualification line"
+    },
+    "MA_200": {
+      "type": "SMA",
+      "period": 200,
+      "color": "Red",
+      "role": "Long-term moving average — bounce target and 200 MA Override trigger"
+    }
   },
-
   "bias_criteria": {
     "bullish": [
-      "Last 1-min candle closed higher than the one before it",
-      "RSI is between 30 and 70"
+      "TSL 1 (White) and/or TSL 2 (Yellow) is IN or JUST CAME FROM the green support area (below 20) on the 5m chart",
+      "TSL 1 (White) and/or TSL 2 (Yellow) is IN or JUST CAME FROM the green support area (below 20) on the 2m chart",
+      "TSL 1 (White) and/or TSL 2 (Yellow) is IN or JUST CAME FROM the green support area (below 20) on the 1m chart",
+      "Exception — 5:2 MAB: if a Moving Average Bounce exists on 5m and 2m, oscillator agreement only required on those two charts (1m is optional confirmation)"
     ],
     "bearish": [
-      "Last 1-min candle closed lower than the one before it",
-      "RSI is between 30 and 70"
+      "TSL 1 (White) and/or TSL 2 (Yellow) is IN or JUST CAME FROM the red resistance area (above 80) on the 5m chart",
+      "TSL 1 (White) and/or TSL 2 (Yellow) is IN or JUST CAME FROM the red resistance area (above 80) on the 2m chart",
+      "TSL 1 (White) and/or TSL 2 (Yellow) is IN or JUST CAME FROM the red resistance area (above 80) on the 1m chart",
+      "Exception — 5:2 MAB: if a Moving Average Bounce exists on 5m and 2m, oscillator agreement only required on those two charts (1m is optional confirmation)"
     ],
     "neutral": [
-      "RSI is above 70 (overbought — skip)",
-      "RSI is below 30 (oversold — skip)",
-      "Candle close change is less than 0.05% (chop — skip)"
+      "TSL 1 and TSL 2 are between 20 and 80 on most timeframes with no clear directional setup",
+      "Mixed signals across timeframes — sit on hands"
     ]
   },
-
   "entry_rules": {
     "long": [
-      "Last close > previous close by at least 0.05%",
-      "RSI between 30 and 70",
-      "Enter market buy immediately"
+      "RULE 1 — OSCILLATORS: TSL 1 and/or TSL 2 must be IN or JUST CAME FROM the green support area (below 20) on ALL THREE charts: 5m, 2m, and 1m. Exception: only the 2 charts where a MAB occurred if a 5:2 MAB is present.",
+      "RULE 2 — PATTERNS: At least TWO foundational patterns must be present. Valid combinations: MAB(Support)+Triple5, MAB(Support)+h-pattern, MAB(Support)+Slingshot, Triple5+h-pattern, Triple5+Slingshot, h-pattern+Slingshot. More than two is fine.",
+      "RULE 3 — TIMING: Enter at the OPEN of the bar immediately after the reversal signal appears on the 2m or 1m chart. Exception: MAB setups — enter at the price of the MA being tested.",
+      "MOVING AVERAGE BOUNCE (Long): Price bars touch and bounce off the 21, 50, or 200 SMA from below. Must occur on BOTH 5m and 2m (5:2 MAB). Require at least 2 closed bars testing the MA before entry. 21 SMA must be ABOVE 50 SMA on the charts where the bounce occurs. 200 MA Override: if bounce is off the 200 SMA on 5m, the 21-above-50 rule is waived for 5m only — still required on 2m. Enter at the price of the MA where the retesting bar closes. Cut-through rule: if price dangles below the MA, sit on hands and wait for the bounce to re-establish.",
+      "TRIPLE 5 (Long): Three consecutive 5m bars whose LOWS are within a few cents of each other after a stair-step down. Bar 1 = first bar whose low does NOT make a new low. Bars 2 and 3 = lows close enough to Bar 1 ('close enough' applies). Wait for Bar 3 to fully close. Enter at the open of the 4th bar.",
+      "STANDARD h PATTERN (Long): Price forms a lowercase h shape or chair — back leg (1st low) then front leg (2nd low at or slightly higher). TSL 1 and/or TSL 2 in or just came from green support area on that chart. Enter near the top of the front (2nd) leg. Needs at least one confirming pattern. Often forms on 2m and 1m charts.",
+      "SLINGSHOT GAP (Long): Qualifying pattern — use in combination with at least one other.",
+      "ADDITIONAL EVIDENCE (increases confidence, not required): Double bottoms (W pattern, higher lows), Lightning Bolt pattern (anticipate bullish continuation after retracement), price at known support level, divergence, Fibonacci retracement levels.",
+      "EXECUTION: Place Market Order — Buy Calls"
     ],
     "short": [
-      "Last close < previous close by at least 0.05%",
-      "RSI between 30 and 70",
-      "Enter market sell immediately"
+      "RULE 1 — OSCILLATORS: TSL 1 and/or TSL 2 must be IN or JUST CAME FROM the red resistance area (above 80) on ALL THREE charts: 5m, 2m, and 1m. Exception: only the 2 charts where a MAB occurred if a 5:2 MAB is present.",
+      "RULE 2 — PATTERNS: At least TWO foundational patterns must be present. Valid combinations: MAB(Resistance)+Triple5, MAB(Resistance)+Inverted-h, MAB(Resistance)+Slingshot, Triple5+Inverted-h, Triple5+Slingshot, Inverted-h+Slingshot. More than two is fine.",
+      "RULE 3 — TIMING: Enter at the OPEN of the bar immediately after the reversal signal appears on the 2m or 1m chart. Exception: MAB setups — enter at the price of the MA being tested.",
+      "MOVING AVERAGE BOUNCE (Short): Price bars touch and bounce off the 21, 50, or 200 SMA from above. Must occur on BOTH 5m and 2m (5:2 MAB). Require at least 2 closed bars testing the MA before entry. 21 SMA must be BELOW 50 SMA on the charts where the bounce occurs. 200 MA Override: if bounce is off the 200 SMA on 5m, the 21-below-50 rule is waived for 5m only — still required on 2m. Enter at the price of the MA where the retesting bar closes.",
+      "TRIPLE 5 (Short): Three consecutive 5m bars whose HIGHS are within a few cents of each other after a stair-step up. Bar 1 = first bar whose high does NOT make a new high. Bars 2 and 3 = highs close enough to Bar 1. Wait for Bar 3 to fully close. Enter at the open of the 4th bar.",
+      "INVERTED h PATTERN (Short): Price forms an upside-down h or inverted chair — back leg (1st high) then front leg (2nd high at or slightly lower). TSL 1 and/or TSL 2 in or just came from red resistance area on that chart. Enter near the bottom of the front (2nd) leg. Needs at least one confirming pattern.",
+      "SLINGSHOT GAP (Short): Qualifying pattern — use in combination with at least one other.",
+      "ADDITIONAL EVIDENCE (increases confidence, not required): Double tops (M pattern, lower highs), Lightning Bolt pattern (anticipate bearish continuation after retracement), price at known resistance level, divergence, Fibonacci retracement levels.",
+      "EXECUTION: Place Market Order — Buy Puts"
     ]
   },
-
   "exit_rules": [
-    "Exit automatically after 10 seconds (next loop tick closes previous position)",
-    "No manual exit management — pure time-based scalp"
+    "Target: $0.75 to $1.00 move in the option premium. Exit when the option has gained $0.75–$1.00 from entry price."
   ],
-
   "risk_rules": [
-    "Fixed trade size: 1% of portfolio per trade",
-    "Maximum trade size: $3.00",
-    "Maximum 6 trades per 60-second run",
-    "No stop loss — exit is time-based at next tick",
-    "For demo purposes only — minimum BitGet order size may apply"
+    "Risk $0.15 per trade. Stop out if the option drops $0.15 from entry price."
   ],
-
-  "notes": "Demo strategy for YouTube video. Runs 6 trades over 60 seconds, one every 10 seconds. Signal is simple price momentum on 1-min candles with RSI sanity check."
+  "notes": "Strategy trades options only (calls for long setups, puts for short setups). Always analyse all three timeframes (5m, 2m, 1m) simultaneously. Preponderance of evidence mindset — more confirming signals equals higher probability trade."
 }
